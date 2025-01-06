@@ -2,7 +2,14 @@ import customtkinter
 import json
 from modules.style import *
 from functools import partial
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
+from PIL import Image
+import io
+import periodictable
+import pathlib
 
+ui_images_path = pathlib.Path(__file__).parent.resolve().joinpath("images","ui")
 pady_section = 20
 pady_section_title = 5
 padx_section_title = 5
@@ -24,6 +31,10 @@ label_style={
     "text_color": "#444",
 }
 
+sublabel_style={
+    "font" : bold18,
+    "text_color": "#666",
+}
 entry_style ={
     "font" : bold16,
     "text_color": "#555",
@@ -49,33 +60,250 @@ def focus_inout(widgetList):
         widget.bind("<FocusIn>", partial(on_focus_in, master=widget))
         widget.bind("<FocusOut>",partial(on_focus_out,master=widget))
 
+def render_latex_to_image(latex_formula, fontsize=20, length=10):
+    fig = Figure(figsize=(length,1), dpi=400,facecolor='none')
+    ax = fig.add_subplot(111,facecolor='none')
+    ax.text(0.5, 0.5, latex_formula, fontsize=60, ha='center', va='center', usetex=True)
+    ax.axis('off')
+    canvas = FigureCanvasAgg(fig)
+    buf = io.BytesIO()
+    canvas.print_png(buf)
+    buf.seek(0)
+    image = Image.open(buf)
+    return customtkinter.CTkImage(image,size=(fontsize*length,fontsize))
+
+def get_proton_number(element_symbol):
+    try:
+        element = periodictable.elements.symbol(element_symbol)
+        return element.number
+    except KeyError:
+        return None
 
 class Nuclear(customtkinter.CTkFrame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent,**kwargs)
+        index = 0
         self.grid_columnconfigure(0, weight=1)
         label = customtkinter.CTkLabel(self, text='Nuclear Name:', **label_style)
         self.nuclear_name = customtkinter.CTkEntry(self, **entry_style)
-        label.grid(row=0, column=0, padx = (padx_left,0), pady = (pady_widget,pady_widget/2),sticky="w")
-        self.nuclear_name.grid(row=0, column=1,sticky="e",padx=(0,padx_right))
+        label.grid(row=index, column=0, padx = (padx_left,0), pady = (pady_widget,pady_widget/2),sticky="w")
+        self.nuclear_name.grid(row=index, column=3,sticky="e",padx=(0,padx_right))
         
+        index +=1
         label = customtkinter.CTkLabel(self, text='Mass Number:',**label_style)
         self.nuclear_mass_number = customtkinter.CTkEntry(self, **entry_style)
-        label.grid(row=1, column=0, padx = (padx_left,0), pady = (pady_widget/2,pady_widget),sticky="w")
-        self.nuclear_mass_number.grid(row=1, column=1,sticky="e",padx=(0,padx_right))
+        label.grid(row=index, column=0, padx = (padx_left,0), pady = (pady_widget/2,pady_widget),sticky="w")
+        self.nuclear_mass_number.grid(row=index, column=3,sticky="e",padx=(0,padx_right))
         
         focus_inout([self.nuclear_name, self.nuclear_mass_number])
-        self.nuclear_mass_number.bind("<Leave>", command=self.set_n0f_according_to_nuclear_mass_number)
+        self.nuclear_name.bind("<Leave>", command=self.set_Z)
+        self.nuclear_mass_number.bind("<Leave>", command=self.set_according_to_nuclear_mass_number)
         
-    def set_n0f_according_to_nuclear_mass_number(self,event):
-        A = int(event.widget.get() or '0')
+        index +=1
+        hline = customtkinter.CTkFrame(self, height=2, fg_color=bordercolor)
+        hline.grid(row=index, column=0, columnspan=4, sticky="ew", padx=20)
+        
+        index+=1
+        label = customtkinter.CTkLabel(self, text="Block Type", **label_style)
+        self.block_type = customtkinter.IntVar(value=0)
+        radiobutton1 = customtkinter.CTkRadioButton(self, text="No",**entry_style, value=0, variable=self.block_type)
+        radiobutton2 = customtkinter.CTkRadioButton(self, text="Given level",**entry_style, value=1, variable=self.block_type)
+        radiobutton3 = self.RadioButton_latex(self,text=r"$K^\pi$", value=2,variable=self.block_type,length=1)
+        label.grid(row=index, column=0, padx=(padx_left,0), pady=(pady_widget,pady_widget/2), sticky="w")
+        radiobutton1.grid(row=index, column=1, padx=(0,padx_right), sticky="w")
+        radiobutton2.grid(row=index, column=2, padx=(0,padx_right), sticky="w")
+        radiobutton3.grid(row=index, column=3, padx=(0,padx_right), sticky="w")
+        
+        index+=1
+        self.neutron_level_label = customtkinter.CTkLabel(self, text='Blocked energy level (Neutron):',**sublabel_style)
+        self.neutron_level = customtkinter.CTkEntry(self, **entry_style)
+        self.neutron_level_label.grid(row=index, column=0, padx = (padx_left+20,0), pady = (pady_widget/2,pady_widget),sticky="w")
+        self.neutron_level.grid(row=index, column=3,sticky="e",padx=(0,padx_right))
+        self.neutron_level.insert(0,"0")
+        index+=1
+        self.proton_level_label = customtkinter.CTkLabel(self, text='Blocked energy level (Proton):',**sublabel_style)
+        self.proton_level = customtkinter.CTkEntry(self, **entry_style)
+        self.proton_level_label.grid(row=index, column=0, padx = (padx_left+20,0), pady = (pady_widget/2,pady_widget),sticky="w")
+        self.proton_level.grid(row=index, column=3,sticky="e",padx=(0,padx_right))
+        self.proton_level.insert(0,"0")
+        
+        index+=1
+        self.neutron_KPi_label = customtkinter.CTkLabel(self, text='Neutron:',**sublabel_style)
+        self.neutron_K = self.KSpinbox(self)
+        self.neutron_Pi = customtkinter.CTkComboBox(self, values=["+", "-"],
+                                                        font = bold18,
+                                                        justify="center",
+                                                        text_color = '#555',
+                                                        width=80,
+                                                        border_color=bordercolor,
+                                                        height = 35,
+                                                        dropdown_font= normal16)
+        self.neutron_Pi.set("+")
+        self.neutron_KPi_label.grid(row=index, column=0, padx = (padx_left+20,0), pady = (pady_widget/2,pady_widget),sticky="w")
+        self.neutron_K.grid(row=index, column=2,sticky="e",padx=(0,padx_right))
+        self.neutron_Pi.grid(row=index, column=3,sticky="w",padx=(0,padx_right))
+        index+=1
+        self.proton_KPi_label = customtkinter.CTkLabel(self, text='Proton:',**sublabel_style)
+        self.proton_K = self.KSpinbox(self)
+        self.proton_Pi = customtkinter.CTkComboBox(self, values=["+", "-"],
+                                                        font = bold20,
+                                                        justify="center",
+                                                        text_color = '#555',
+                                                        width=80,
+                                                        border_color=bordercolor,
+                                                        height = 35,
+                                                        dropdown_font= normal16)
+        self.proton_KPi_label.grid(row=index, column=0, padx = (padx_left+20,0), pady = (pady_widget/2,pady_widget),sticky="w")
+        self.proton_K.grid(row=index, column=2,sticky="e",padx=(0,padx_right))
+        self.proton_Pi.grid(row=index, column=3,sticky="w",padx=(0,padx_right))
+        
+        
+        index+=1
+        self.block_method_label = customtkinter.CTkLabel(self, text="Block Method", **label_style)
+        self.block_method = customtkinter.IntVar(value=2)
+        self.block_method_radiobutton1 = customtkinter.CTkRadioButton(self, text="BC",**entry_style, value=1, variable=self.block_method)
+        self.block_method_radiobutton2 = customtkinter.CTkRadioButton(self, text="CB",**entry_style, value=2, variable=self.block_method)
+        self.block_method_radiobutton3 = customtkinter.CTkRadioButton(self, text="CBC",**entry_style, value=3, variable=self.block_method)
+        self.block_method_label.grid(row=index, column=0, padx=(padx_left,0), pady=(pady_widget,pady_widget/2), sticky="w")
+        self.block_method_radiobutton1.grid(row=index, column=1, padx=(0,0), sticky="w")
+        self.block_method_radiobutton2.grid(row=index, column=2, padx=(0,padx_right), sticky="w")
+        self.block_method_radiobutton3.grid(row=index, column=3, padx=(0,padx_right), sticky="w")
+        
+        self.update_block_visibility()
+        self.block_type.trace_add("write", lambda *args: self.update_block_visibility())
+        
+    def set_Z(self,event):
+        self.Z = get_proton_number(event.widget.get())
+
+    def set_according_to_nuclear_mass_number(self,event):
+        self.A = int(event.widget.get() or '0')
+        # set N0f
+        A = self.A
         if(A>0 and A<50):
             global_n0f_variable.set(8)
         elif(A>=50 and A<100):
             global_n0f_variable.set(10)
         elif(A>=100):
             global_n0f_variable.set(12)
+        
+        # set block action
+        self.N = self.A -self.Z
+        if (self.N%2==1 or self.Z%2==1):
+            self.block_type.set(2)
+        else:
+            self.block_type.set(0)
 
+    def RadioButton_latex(self,master, value,text,variable,fontsize=20,length=10):
+        frame = customtkinter.CTkFrame(master,fg_color="transparent")
+        radiobutton = customtkinter.CTkRadioButton(frame, text="", value=value, variable=variable,width=20)
+        latex_text = customtkinter.CTkLabel(frame,text="",image=render_latex_to_image(text,fontsize=fontsize,length=length))
+        radiobutton.grid(row=0, column=0,padx=0)
+        latex_text.grid(row=0, column=1,padx=0)
+        return frame
+
+    class KSpinbox(customtkinter.CTkFrame):
+        def __init__(self, *args,
+                    width: int = 100,
+                    height: int = 26,
+                    **kwargs):
+            super().__init__(*args, width=width, height=height, **kwargs,border_width=2,border_color=bordercolor)
+            self.configure(fg_color=("#fff", "gray28"))  # set frame color
+            self.grid_columnconfigure(1, weight=1)  # entry expands
+            
+            self.K = customtkinter.IntVar(value=0)
+            self.K_text=customtkinter.StringVar(value="-/-")
+            
+            left_png = customtkinter.CTkImage(Image.open(ui_images_path.joinpath("left.png")), size = (10,20))
+            self.subtract_button = customtkinter.CTkButton(self, text="",image=left_png, width=10, height=20,
+                                                        command=self.subtract_button_callback,fg_color="transparent")
+            self.subtract_button.grid(row=0, column=0, padx=(3, 0), pady=3)
+           
+            self.label = customtkinter.CTkLabel(self, textvariable=self.K_text, width=40, height=20
+                                                ,fg_color="white",font=bold16, text_color="#555")
+            self.label.grid(row=0, column=1, columnspan=1, padx=3, pady=3, sticky="ew")
+            
+            right_png = customtkinter.CTkImage(Image.open(ui_images_path.joinpath("right.png")), size = (10,20))
+            self.add_button = customtkinter.CTkButton(self, text="", image=right_png, width=20, height=20,
+                                                    command=self.add_button_callback,fg_color="transparent")
+            self.add_button.grid(row=0, column=2, padx=(0, 3), pady=3)
+
+        def add_button_callback(self):
+            try:
+                value = int(self.K.get()) + 1
+                self.K_text.set(f"{value*2-1}/2")
+                self.K.set(value)
+            except ValueError:
+                return
+
+        def subtract_button_callback(self):
+            try:
+                value = int(self.K.get()) - 1
+                if(value > 0):
+                    self.K_text.set(f"{value*2-1}/2")
+                    self.K.set(value)
+            except ValueError:
+                return
+
+        def get(self):
+            try:
+                return int(self.K.get())
+            except ValueError:
+                return None
+        
+        
+    def update_block_visibility(self):
+        value = self.block_type.get()
+        if value == 0:  # no block
+            self.neutron_level_label.grid_remove()
+            self.neutron_level.grid_remove()
+            self.proton_level_label.grid_remove()
+            self.proton_level.grid_remove()
+            self.neutron_KPi_label.grid_remove()
+            self.neutron_K.grid_remove()
+            self.neutron_Pi.grid_remove()
+            self.proton_KPi_label.grid_remove()
+            self.proton_K.grid_remove()
+            self.proton_Pi.grid_remove()
+            self.block_method_label.grid_remove()
+            self.block_method_radiobutton1.grid_remove()
+            self.block_method_radiobutton2.grid_remove()
+            self.block_method_radiobutton3.grid_remove()
+            
+            
+        elif  value==1:
+            if(self.N %2==1):
+                self.neutron_level_label.grid()
+                self.neutron_level.grid()
+            if(self.Z %2==1):
+                self.proton_level_label.grid()
+                self.proton_level.grid()
+            self.neutron_KPi_label.grid_remove()
+            self.neutron_K.grid_remove()
+            self.neutron_Pi.grid_remove()
+            self.proton_KPi_label.grid_remove()
+            self.proton_K.grid_remove()
+            self.proton_Pi.grid_remove()
+            self.block_method_label.grid()
+            self.block_method_radiobutton1.grid()
+            self.block_method_radiobutton2.grid()
+            self.block_method_radiobutton3.grid()
+        elif  value==2:
+            self.neutron_level_label.grid_remove()
+            self.neutron_level.grid_remove()
+            self.proton_level_label.grid_remove()
+            self.proton_level.grid_remove()
+            if(self.N %2==1):
+                self.neutron_KPi_label.grid()
+                self.neutron_K.grid()
+                self.neutron_Pi.grid()
+            if(self.Z %2==1):
+                self.proton_KPi_label.grid()
+                self.proton_K.grid()
+                self.proton_Pi.grid()
+            self.block_method_label.grid()
+            self.block_method_radiobutton1.grid_remove()
+            self.block_method_radiobutton2.grid()
+            self.block_method_radiobutton3.grid()
 class Force(customtkinter.CTkFrame):
     def __init__(self,parent,**kwargs):
         super().__init__(parent,**kwargs)
@@ -180,7 +408,7 @@ class Constraint(customtkinter.CTkFrame):
         super().__init__(parent,**kwargs)
         self.grid_columnconfigure(0, weight=1)
         label = customtkinter.CTkLabel(self, text='Constraint Type:',**label_style)
-        self.icstr = customtkinter.IntVar()
+        self.icstr = customtkinter.IntVar(value=0)
         radiobutton1 = customtkinter.CTkRadioButton(self, text="no",**entry_style, value=0, variable=self.icstr)
         radiobutton2 = customtkinter.CTkRadioButton(self, text="beta2",**entry_style, value=1, variable=self.icstr)
         radiobutton3 = customtkinter.CTkRadioButton(self, text="beta2+beta3",**entry_style, value=2, variable=self.icstr)
@@ -329,9 +557,25 @@ class Configuration(customtkinter.CTkScrollableFrame):
         self.runButton.grid(row= row_index, column = 0, pady=(pady_section,pady_section))
     
     def save_configuration(self):
+        if self.nuclei.neutron_Pi.get() =="+":
+            neutron_Pi = 1
+        else:
+            neutron_Pi = -1
+        if self.nuclei.proton_Pi.get() =="+":
+            proton_Pi = 1
+        else:
+            proton_Pi = -1
         configuration_data = {
             "nuclear_name" : self.nuclei.nuclear_name.get(),
             "nuclear_mass_number" : self.nuclei.nuclear_mass_number.get(),
+            "block_type": self.nuclei.block_type.get(),
+            "neutron_level":self.nuclei.neutron_level.get(),
+            "proton_level":self.nuclei.proton_level.get(),
+            "neutron_K": self.nuclei.neutron_K.get(),
+            "neutron_Pi": neutron_Pi,
+            "proton_K": self.nuclei.proton_K.get(),
+            "proton_Pi": proton_Pi,
+            "block_method":self.nuclei.block_method.get(),
             "force_option" : self.force.force_option.get(),
             "V0" : [self.force.V0_neutron.get(), self.force.V0_proton.get()],
             "n0f" : self.basis.n0f.get(),
