@@ -507,7 +507,18 @@ class Iteration_config(customtkinter.CTkFrame):
         hint.grid(row=3, column=0, padx = (padx_left,0), pady=(0,pady_widget/2),sticky="w")
         xmix.grid(row=2, column=1, rowspan=2, padx=(0,padx_right),sticky="e")
 
-
+class OutputOption(customtkinter.CTkFrame):
+    def __init__(self,parent,**kwargs):
+        super().__init__(parent,**kwargs)
+        self.grid_columnconfigure(0, weight=1)
+        label = customtkinter.CTkLabel(self, text='RCE:',**label_style)
+        self.Erot_option = customtkinter.CTkComboBox(self, values=["No", "EE: IB", "EE: NP", "OA: F(regulator)"],
+                                                        **entry_style,
+                                                        height = 35,
+                                                        dropdown_font= normal16)
+        label.grid(row=0, column=0, padx = (padx_left,0), pady=(pady_widget,pady_widget),sticky="w")
+        self.Erot_option.grid(row=0, column=1, padx=(0,padx_right),sticky="e")
+        
 class Configuration(customtkinter.CTkScrollableFrame):
     def __init__(self,  parent, **kwargs):
         super().__init__(parent,**kwargs)
@@ -551,12 +562,23 @@ class Configuration(customtkinter.CTkScrollableFrame):
         self.interation = Iteration_config(self,fg_color="transparent", border_width=2, border_color=bordercolor)
         self.interation.grid(row=row_index, column=0, padx =(0,padx_right_to_scroll), pady=(pady_section_title,pady_section),sticky='nsew')
         
+        row_index+=1
+        label = customtkinter.CTkLabel(self,text="Output Setting", **section_title_style)
+        label.grid(row= row_index, column = 0, padx= (padx_section_title,0),sticky="w")
+        row_index+=1
+        self.output = OutputOption(self,fg_color="transparent", border_width=2, border_color=bordercolor)
+        self.output.grid(row=row_index, column=0, padx =(0,padx_right_to_scroll), pady=(pady_section_title,pady_section),sticky='nsew')
 
         row_index+=1
         self.runButton = customtkinter.CTkButton(self, text="Save",font=bold18, command = self.save_configuration)
         self.runButton.grid(row= row_index, column = 0, pady=(pady_section,pady_section))
     
     def save_configuration(self):
+        if len(self.nuclei.nuclear_name.get()) == 1:
+            nuclear_name = "_"+self.nuclei.nuclear_name.get()
+        else:
+            nuclear_name = self.nuclei.nuclear_name.get()
+        #
         if self.nuclei.neutron_Pi.get() =="+":
             neutron_Pi = 1
         else:
@@ -565,8 +587,18 @@ class Configuration(customtkinter.CTkScrollableFrame):
             proton_Pi = 1
         else:
             proton_Pi = -1
+        # 
+        if self.output.Erot_option.get() == "EE: IB":
+            Erot_option = 1
+        elif self.output.Erot_option.get() == "EE: NP":
+            Erot_option = 2
+        elif self.output.Erot_option.get() == "OA: F(regulator)":
+            Erot_option = 3
+        else :
+            Erot_option = 0
+            
         configuration_data = {
-            "nuclear_name" : self.nuclei.nuclear_name.get(),
+            "nuclear_name" : nuclear_name,
             "nuclear_mass_number" : self.nuclei.nuclear_mass_number.get(),
             "block_type": self.nuclei.block_type.get(),
             "neutron_level":self.nuclei.neutron_level.get(),
@@ -589,6 +621,7 @@ class Configuration(customtkinter.CTkScrollableFrame):
             "icstr" : self.constraint.icstr.get(),
             "cspr" : self.constraint.cspr.get(),
             "cmax" : self.constraint.cmax.get(),
+            "Erot" : Erot_option,
             "beta2":{
                 "start": self.constraint.beta2.start.get(),
                 "end": self.constraint.beta2.end.get(),

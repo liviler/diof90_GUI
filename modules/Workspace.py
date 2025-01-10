@@ -130,11 +130,7 @@ class Configurator_select_Run(customtkinter.CTkFrame):
             f.write(f"maxi     =  {configuration_data['maxi']}\n")
             f.write(f"xmix     =  {configuration_data['xmix']}\n")
             f.write(f"inin     =  {configuration_data['inin']}\n")
-            if len(configuration_data["nuclear_name"])==1:
-                nuclear_name = "_"+configuration_data["nuclear_name"] 
-            elif len(configuration_data["nuclear_name"])==2:
-                nuclear_name = configuration_data["nuclear_name"] 
-            f.write(f"{nuclear_name}  {configuration_data["nuclear_mass_number"]}\n")
+            f.write(f"{configuration_data["nuclear_name"]}  {configuration_data["nuclear_mass_number"]}\n")
             f.write( "Ide      =  4  4  \n")
             f.write( "Delta    =  0.000000  0.000000 \n")
             f.write( "Ga       =  0.000000  0.000000 \n")
@@ -155,8 +151,7 @@ class Configurator_select_Run(customtkinter.CTkFrame):
             f.write(f"Kp       =  {configuration_data["proton_K"]}\n")
             f.write(f"Pip      =  {configuration_data["proton_Pi"]}\n")
             f.write(f"bMethod  =  {configuration_data["block_method"]}\n")
-            f.write(f"qsn      =  {configuration_data["neutron_level"]}\n")
-            f.write( "crankCase=  2")
+            f.write(f"Erot     =  {configuration_data["Erot"]}\n")
 
     def generate_b23_dat(self):
         configuration_data = read_json(self.configuration_path.get())
